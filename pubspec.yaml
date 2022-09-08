@@ -1,0 +1,18 @@
+name: postgresql_dart_replication_example
+description: An example for listening to Logical Replication in Dart (e.g. listen changes in tables)
+version: 0.0.1
+homepage: https://github.com/osaxma/postgresql-dart-replication-example
+publish_to: none
+
+environment:
+  sdk: '>=2.18.0 <3.0.0'
+
+dependencies:
+  postgres: 
+    git: 
+      url: https://github.com/osaxma/postgresql-dart
+      ref: replication 
+
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.16.0
