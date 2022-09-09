@@ -77,7 +77,7 @@ This repo contains an example in the [example folder](/examples/) for listening 
 
 The example is based on a fork from [`postgres` pacakge](https://github.com/osaxma/postgresql-dart) using the `replication` branch. 
 
-The changes wasn't yet proposed to the upstream package as it introduces an entirely new protocol (i.e. Streaming Replication Protocol) to the existing Extended Query Protocol. Once the fork is polished and the api is finalized, the changes will be proposed to the original package. No promises tho.
+PR can be found here: https://github.com/isoos/postgresql-dart/pull/50
 
 Important Note: this is just an example and the fork is not ready for production unless you know what you're doing on the PostgreSQL side. 
 
