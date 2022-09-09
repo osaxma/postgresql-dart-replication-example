@@ -38,7 +38,7 @@ void main(List<String> arguments) async {
       if (msg.mustReply) {
         final statusUpdate = StandbyStatusUpdateMessage(walWritePosition: clientXLogPos, mustReply: false);
         final copyDataMessage = CopyDataMessage(statusUpdate.asBytes());
-        conn.socket!.add(copyDataMessage.asBytes());
+        conn.addMessage(copyDataMessage);
       }
     }
 
@@ -75,8 +75,8 @@ void main(List<String> arguments) async {
   final replicationSlotName = 'a_test_slot';
 
   // create the publication and drop it if it exists
-  await conn.executeSimple('DROP PUBLICATION IF EXISTS $publicationName;');
-  await conn.executeSimple('CREATE PUBLICATION $publicationName FOR ALL TABLES;');
+  await conn.simpleQuery('DROP PUBLICATION IF EXISTS $publicationName;');
+  await conn.simpleQuery('CREATE PUBLICATION $publicationName FOR ALL TABLES;');
 
   /* -------------------------------------------------------------------------- */
   /*                           create replication slot                          */
@@ -88,7 +88,7 @@ void main(List<String> arguments) async {
 
   // Identify the system to get the `xlogpos` which is the current WAL flush location.
   // Useful to get a known location in the write-ahead log where streaming can start.
-  final sysInfo = ((await conn.executeSimple('IDENTIFY_SYSTEM;')) as PostgreSQLResult).first.toColumnMap();
+  final sysInfo = ((await conn.simpleQuery('IDENTIFY_SYSTEM;')) as PostgreSQLResult).first.toColumnMap();
   final xlogpos = sysInfo['xlogpos'] as String;
   clientXLogPos = LSN.fromString(xlogpos);
   // final timeline = sysInfo['timeline'] as String; // can be used for physical replication
@@ -113,7 +113,7 @@ void main(List<String> arguments) async {
   /// This future won't complete unless the server drops the connection
   /// or an error occurs
   /// or it times out
-  await conn.executeSimple(stmt, timeoutInSeconds: 3600).catchError((e) {
+  await conn.simpleQuery(stmt, timeoutInSeconds: 3600).catchError((e) {
     return null;
   });
 }
@@ -127,7 +127,7 @@ Future<dynamic> dropReplicationSlotIfExists(PostgreSQLConnection conn, String sl
   // will throw an error if the replication slot does not exist
   // see other replication mgmt functions here:
   // https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-REPLICATION
-  return await conn.executeSimple(
+  return await conn.simpleQuery(
     "select pg_drop_replication_slot('$slotname') from pg_replication_slots where slot_name = '$slotname';",
   );
 }

@@ -195,7 +195,7 @@ packages:
     description:
       path: "."
       ref: replication
-      resolved-ref: "969a209038130f8ba5484471442a1da51c5420f0"
+      resolved-ref: "2d7254543cb4fbdc314f3bc07f755c821371a138"
       url: "https://github.com/osaxma/postgresql-dart"
     source: git
     version: "2.4.6"
