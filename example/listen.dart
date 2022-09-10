@@ -83,8 +83,7 @@ void main(List<String> arguments) async {
   /* -------------------------------------------------------------------------- */
   // read more here: https://www.postgresql.org/docs/current/protocol-replication.html
   await dropReplicationSlotIfExists(conn, replicationSlotName);
-  await conn
-      .execute('CREATE_REPLICATION_SLOT $replicationSlotName LOGICAL ${replicationOutput.name} NOEXPORT_SNAPSHOT');
+  await conn.execute('CREATE_REPLICATION_SLOT $replicationSlotName LOGICAL wal2json NOEXPORT_SNAPSHOT');
 
   // Identify the system to get the `xlogpos` which is the current WAL flush location.
   // Useful to get a known location in the write-ahead log where streaming can start.
@@ -100,9 +99,9 @@ void main(List<String> arguments) async {
   late final String stmt;
   switch (replicationOutput) {
     case LogicalDecodingPlugin.pgoutput:
-      stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
-          "(proto_version '1', publication_names '$publicationName')";
-      break;
+    // stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
+    //     "(proto_version '1', publication_names '$publicationName')";
+    // break;
     case LogicalDecodingPlugin.wal2json:
       stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
           "(\"pretty-print\" 'true')";
@@ -131,3 +130,44 @@ Future<dynamic> dropReplicationSlotIfExists(PostgreSQLConnection conn, String sl
     "select pg_drop_replication_slot('$slotname') from pg_replication_slots where slot_name = '$slotname';",
   );
 }
+
+
+/* 
+
+This won't be available in postgres package (kept here for reference to be added as an example)
+
+/* 
+
+  /// The Logical Decoding Output for streaming replication mode
+  ///
+  /// The default value is [LogicalDecodingPlugin.pgoutput]. To use [LogicalDecodingPlugin.wal2json],
+  /// the [wal2json] plugin must be installed in the database. 
+  /// 
+  /// [logicalDecodingPlugin] is only used when [replicationMode] is not equal to [ReplicationMode.none].
+  /// 
+  /// [wal2json]: https://github.com/eulerto/wal2json
+  final LogicalDecodingPlugin logicalDecodingPlugin;
+ */
+
+
+/// The Logical Decoding Output Plugins For Streaming Replication
+///
+/// [pgoutput] is the standard logical decoding plugin that is built in
+/// PostgreSQL since version 10.
+///
+/// [wal2json] is a popular output plugin for logical decoding. The extension
+/// must be available on the database when using this output option. When using
+/// [wal2json] plugin, the following are some limitations:
+/// - the plug-in does not emit events for tables without primary keys
+/// - the plug-in does not support special values (NaN or infinity) for floating
+///   point types
+///
+/// For more info, see [wal2json repo][].
+///
+/// [wal2json repo]: https://github.com/eulerto/wal2json
+enum LogicalDecodingPlugin {
+  pgoutput,
+  wal2json,
+} 
+
+*/

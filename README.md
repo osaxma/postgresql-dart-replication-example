@@ -1,6 +1,6 @@
 # Listening PostgreSQL Logical Replication
 
-This repo contains an example in the [example folder](/examples/) for listening to Postgresql Logical Replication. This allows listening to changes in PostgreSQL database in the following manner:
+This repo contains an example under the [example folder](/example/) for listening to Postgresql Logical Replication. This allows listening to changes in PostgreSQL database in the following manner:
 
 - Insert changes (one row):
     ```json
