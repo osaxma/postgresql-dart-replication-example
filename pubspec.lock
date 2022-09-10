@@ -193,12 +193,10 @@ packages:
   postgres:
     dependency: "direct main"
     description:
-      path: "."
-      ref: replication
-      resolved-ref: "2d7254543cb4fbdc314f3bc07f755c821371a138"
-      url: "https://github.com/osaxma/postgresql-dart"
-    source: git
-    version: "2.4.6"
+      name: postgres
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.5.0"
   pub_semver:
     dependency: transitive
     description:

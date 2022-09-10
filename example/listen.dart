@@ -13,7 +13,7 @@ void main(List<String> arguments) async {
   // choose a replication mode
   final replicationMode = ReplicationMode.logical;
   // choose a replication plugin decoding
-  final replicationOutput = LogicalDecodingPlugin.wal2json; // try LogicalDecodingPlugin.pgoutput
+  final replicationOutput = 'wal2json'; // another option is 'pgoutput'
   final conn = PostgreSQLConnection(
     'localhost',
     5432,
@@ -21,7 +21,6 @@ void main(List<String> arguments) async {
     username: 'postgres',
     password: 'postgres',
     replicationMode: replicationMode,
-    logicalDecodingPlugin: replicationOutput,
   );
   await conn.open();
 
@@ -75,8 +74,8 @@ void main(List<String> arguments) async {
   final replicationSlotName = 'a_test_slot';
 
   // create the publication and drop it if it exists
-  await conn.simpleQuery('DROP PUBLICATION IF EXISTS $publicationName;');
-  await conn.simpleQuery('CREATE PUBLICATION $publicationName FOR ALL TABLES;');
+  await conn.query('DROP PUBLICATION IF EXISTS $publicationName;', useSimpleQueryProtocol: true);
+  await conn.query('CREATE PUBLICATION $publicationName FOR ALL TABLES;', useSimpleQueryProtocol: true);
 
   /* -------------------------------------------------------------------------- */
   /*                           create replication slot                          */
@@ -87,7 +86,7 @@ void main(List<String> arguments) async {
 
   // Identify the system to get the `xlogpos` which is the current WAL flush location.
   // Useful to get a known location in the write-ahead log where streaming can start.
-  final sysInfo = ((await conn.simpleQuery('IDENTIFY_SYSTEM;')) as PostgreSQLResult).first.toColumnMap();
+  final sysInfo = (await conn.query('IDENTIFY_SYSTEM;', useSimpleQueryProtocol: true)).first.toColumnMap();
   final xlogpos = sysInfo['xlogpos'] as String;
   clientXLogPos = LSN.fromString(xlogpos);
   // final timeline = sysInfo['timeline'] as String; // can be used for physical replication
@@ -97,23 +96,20 @@ void main(List<String> arguments) async {
   /* -------------------------------------------------------------------------- */
   // read more here: https://www.postgresql.org/docs/current/protocol-replication.html
   late final String stmt;
-  switch (replicationOutput) {
-    case LogicalDecodingPlugin.pgoutput:
-    // stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
-    //     "(proto_version '1', publication_names '$publicationName')";
-    // break;
-    case LogicalDecodingPlugin.wal2json:
-      stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
-          "(\"pretty-print\" 'true')";
-      break;
+  if (replicationOutput == 'wal2json') {
+    stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
+        "(\"pretty-print\" 'true')";
+  } else {
+    stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
+        "(proto_version '1', publication_names '$publicationName')";
   }
 
   /// Run the start replication statement
   /// This future won't complete unless the server drops the connection
   /// or an error occurs
   /// or it times out
-  await conn.simpleQuery(stmt, timeoutInSeconds: 3600).catchError((e) {
-    return null;
+  await conn.execute(stmt, timeoutInSeconds: 3600).catchError((e) {
+    return 0;
   });
 }
 
@@ -126,8 +122,9 @@ Future<dynamic> dropReplicationSlotIfExists(PostgreSQLConnection conn, String sl
   // will throw an error if the replication slot does not exist
   // see other replication mgmt functions here:
   // https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-REPLICATION
-  return await conn.simpleQuery(
+  return await conn.query(
     "select pg_drop_replication_slot('$slotname') from pg_replication_slots where slot_name = '$slotname';",
+    useSimpleQueryProtocol: true,
   );
 }
 

@@ -266,3 +266,5 @@ CommitMessage(flags: 0, commitLSN: 0/1732768, transactionEndLSN: 0/17328D8, comm
 </details>
 
 
+## Notes
+Remember this is just an example. There's more to managing replication slots and its configuration. Be cautious when using this on a production database to avoid unintended consequences (e.g., out of memory errors caused by replication slots and such). 

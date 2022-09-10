@@ -8,10 +8,8 @@ environment:
   sdk: '>=2.18.0 <3.0.0'
 
 dependencies:
-  postgres: 
-    git: 
-      url: https://github.com/osaxma/postgresql-dart
-      ref: replication 
+  # must be 2.5.0 or above. 
+  postgres: ^2.5.0
 
 dev_dependencies:
   lints: ^2.0.0
