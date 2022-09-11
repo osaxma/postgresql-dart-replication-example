@@ -7,21 +7,21 @@
 - Docker
 
 ## Set up the database 
-1. Clone the repo this repo:
+1. Clone this repo:
     ```
     git clone https://github.com/osaxma/postgresql-dart-replication-example.git
     ```
 2. Run `dart pub get`. 
 
-3. Run `cd postgresql-dart-replication-example/examples`
+3. Run `cd postgresql-dart-replication-example/example`
 
 4. Build a docker image for PostgreSQL with wal2json (this will take few minutes to download images and whatnot):
     ```
     docker build -t replication_example_image . 
     ```
-    must be in `examples` when running the command above)
+    must be within `example` folder when running the command above
 
-5. run the container (the configs starting with `-c` are necessary for replication to work)
+5. Run the container (the three configs starting with `-c` are necessary for replication to work)
     ```
     docker run -d -p 5432:5432 --name replication_example_container replication_example_image -c wal_level=logical -c max_replication_slots=5 -c max_wal_senders=5
     ```
