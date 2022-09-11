@@ -1,8 +1,11 @@
 FROM postgres:latest
 
+ENV POSTGRES_PASSWORD=postgres1
+ENV POSTGRES_USER=postgres1
+ENV POSTGRES_DB=postgres1
+
 RUN apt-get update
 RUN apt-get install -y postgresql-14-wal2json
-
 
 # Install the packages which will be required to get everything to compile
 RUN apt-get update \

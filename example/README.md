@@ -15,40 +15,16 @@
 
 3. Run `cd postgresql-dart-replication-example/examples`
 
-4. Build a docker image for PostgreSQL with wal2json (this will take few minutes):
+4. Build a docker image for PostgreSQL with wal2json (this will take few minutes to download images and whatnot):
     ```
     docker build -t replication_example_image . 
     ```
     must be in `examples` when running the command above)
 
-5. run the container
+5. run the container (the configs starting with `-c` are necessary for replication to work)
     ```
-    docker run -d -p 5432:5432 --name replication_example_container -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres replication_example_image
+    docker run -d -p 5432:5432 --name replication_example_container replication_example_image -c wal_level=logical -c max_replication_slots=5 -c max_wal_senders=5
     ```
-6. Set up the database for replication by running the following commands
-    ```
-    docker exec replication_example_container psql -U postgres -w -c "ALTER SYSTEM SET wal_level = logical;"
-
-    docker exec replication_example_container psql -U postgres -w -c "ALTER SYSTEM SET max_replication_slots = 10;"
-
-    docker exec replication_example_container psql -U postgres -w -c "ALTER SYSTEM SET max_wal_senders = 10;"
-    ```
-7. restart the container for changes to take effect:
-    ```
-    docker restart replication_example_container
-    ```
-8. Confirm the changes
-    ```
-    docker exec rep_ex psql -U postgres -w -c "show wal_level;"
-    ```
-    This should print:
-    ```
-     wal_level
-    -----------
-    logical
-    (1 row)
-    ```
-
 
 
 ## Run the examples
