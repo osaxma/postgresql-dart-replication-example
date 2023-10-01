@@ -21,6 +21,7 @@ void main(List<String> arguments) async {
     username: 'postgres',
     password: 'postgres',
     replicationMode: replicationMode,
+    encoding: utf8,
   );
   await conn.open();
 
@@ -36,7 +37,8 @@ void main(List<String> arguments) async {
     } else if (msg is PrimaryKeepAliveMessage) {
       if (msg.mustReply) {
         final statusUpdate = StandbyStatusUpdateMessage(walWritePosition: clientXLogPos, mustReply: false);
-        final copyDataMessage = CopyDataMessage(statusUpdate.asBytes());
+        // in older versions, `asBytes` didn't require encoding to be passed so remove it if it gives u an error
+        final copyDataMessage = CopyDataMessage(statusUpdate.asBytes(encoding: utf8)); 
         conn.addMessage(copyDataMessage);
       }
     }
@@ -87,6 +89,7 @@ void main(List<String> arguments) async {
   // Identify the system to get the `xlogpos` which is the current WAL flush location.
   // Useful to get a known location in the write-ahead log where streaming can start.
   final sysInfo = (await conn.query('IDENTIFY_SYSTEM;', useSimpleQueryProtocol: true)).first.toColumnMap();
+  print(sysInfo);
   final xlogpos = sysInfo['xlogpos'] as String;
   clientXLogPos = LSN.fromString(xlogpos);
   // final timeline = sysInfo['timeline'] as String; // can be used for physical replication
