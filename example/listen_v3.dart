@@ -12,7 +12,7 @@ import 'package:postgres/messages.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:async/async.dart';
 
-/// A "Channel" that can send and receive messages to and from the Server. 
+/// A "Channel" that can send and receive messages to and from the Server.
 class _ServerChannel {
   final controller = StreamController<ServerMessage>.broadcast();
 
@@ -56,7 +56,7 @@ class _ServerChannel {
 
 // choose a replication plugin decoding
 
-final transformer = _ServerChannel();
+final serverChannel = _ServerChannel();
 
 void main(List<String> arguments) async {
   final conn = await PgConnection.open(
@@ -71,7 +71,7 @@ void main(List<String> arguments) async {
         replicationMode: ReplicationMode.logical,
         queryMode: QueryMode.simple,
         onBadSslCertificate: (cert) => true,
-        transformer: transformer.transformer,
+        transformer: serverChannel.transformer,
         encoding: utf8),
   );
 
@@ -82,7 +82,7 @@ void main(List<String> arguments) async {
   /* -------------------------------------------------------------------------- */
   // this will handle keep alive messages and print any replication messages
   late LSN clientXLogPos;
-  final messagesSub = transformer.messages.listen((msg) {
+  final messagesSub = serverChannel.messages.listen((msg) {
     /// Handle Keep Alive Messages to avoid losing connection
     if (msg is XLogDataMessage) {
       clientXLogPos = msg.walStart + msg.walDataLength;
@@ -90,7 +90,7 @@ void main(List<String> arguments) async {
       if (msg.mustReply) {
         final statusUpdate = StandbyStatusUpdateMessage(walWritePosition: clientXLogPos, mustReply: false);
         final copyDataMessage = CopyDataMessage(statusUpdate.asBytes(encoding: utf8));
-        transformer.addMessage(copyDataMessage);
+        serverChannel.addMessage(copyDataMessage);
       }
     }
 
