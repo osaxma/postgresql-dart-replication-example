@@ -27,9 +27,6 @@ class _ServerChannel {
     _cachedSink!.add(message);
   }
 
-  // For the current set of tests, we are only listening to server events and
-  // we are not sending anything to the server so the second handler is left
-  // empty
   late final transformer = StreamChannelTransformer<BaseMessage, BaseMessage>(
     // to listen to server messages
     StreamTransformer.fromHandlers(
@@ -44,17 +41,24 @@ class _ServerChannel {
     // this is intended to listen to client messages
     // but we capture the sink and cache it so we can send messages
     // to the server when needed.
-    StreamSinkTransformer.fromHandlers(handleData: (data, sink) {
-      if (_cachedSink != sink) {
-        _cachedSink = sink;
-      }
-      // let the message continue its journey
-      sink.add(data);
-    }),
+    StreamSinkTransformer.fromHandlers(
+      handleData: (data, sink) {
+        if (_cachedSink != sink) {
+          _cachedSink = sink;
+        }
+        // let the message continue its journey
+        sink.add(data);
+      },
+      handleDone: (_) {
+        _cachedSink = null;
+      },
+      handleError: (_, __, ___) {
+        _cachedSink = null;
+        // handle the error ...
+      },
+    ),
   );
 }
-
-// choose a replication plugin decoding
 
 final serverChannel = _ServerChannel();
 
@@ -75,6 +79,7 @@ void main(List<String> arguments) async {
         encoding: utf8),
   );
 
+  // choose a replication plugin decoding
   final replicationOutput = 'wal2json'; // another option is 'pgoutput'
 
   /* -------------------------------------------------------------------------- */

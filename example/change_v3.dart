@@ -1,4 +1,3 @@
-import 'package:postgres/postgres.dart';
 import 'package:postgres/postgres_v3_experimental.dart';
 
 /// Run this file after running `listen.dart`
