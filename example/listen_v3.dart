@@ -1,43 +1,96 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
-// ignore_for_file: unused_import
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:postgres/postgres_v3_experimental.dart';
 import 'package:postgres/postgres.dart';
 import 'package:postgres/messages.dart';
 
-void main(List<String> arguments) async {
-  // choose a replication mode
-  final replicationMode = ReplicationMode.logical;
-  // choose a replication plugin decoding
-  final replicationOutput = 'wal2json'; // another option is 'pgoutput'
-  final conn = PostgreSQLConnection(
-    'localhost',
-    5432,
-    'postgres',
-    username: 'postgres',
-    password: 'postgres',
-    replicationMode: replicationMode,
+// You need to add these two packages to pubspec.yaml
+import 'package:stream_channel/stream_channel.dart';
+import 'package:async/async.dart';
+
+/// A "Channel" that can send and receive messages to and from the Server. 
+class _ServerChannel {
+  final controller = StreamController<ServerMessage>.broadcast();
+
+  Stream<ServerMessage> get messages => controller.stream;
+
+  EventSink<BaseMessage>? _cachedSink;
+
+  void addMessage(BaseMessage message) {
+    if (_cachedSink == null) {
+      throw Exception('Cannot send message because sink is not available');
+    }
+    _cachedSink!.add(message);
+  }
+
+  // For the current set of tests, we are only listening to server events and
+  // we are not sending anything to the server so the second handler is left
+  // empty
+  late final transformer = StreamChannelTransformer<BaseMessage, BaseMessage>(
+    // to listen to server messages
+    StreamTransformer.fromHandlers(
+      handleData: (data, sink) {
+        if (!controller.isClosed) {
+          controller.add(data as ServerMessage);
+        }
+        // let the message continue its journey
+        sink.add(data);
+      },
+    ),
+    // this is intended to listen to client messages
+    // but we capture the sink and cache it so we can send messages
+    // to the server when needed.
+    StreamSinkTransformer.fromHandlers(handleData: (data, sink) {
+      if (_cachedSink != sink) {
+        _cachedSink = sink;
+      }
+      // let the message continue its journey
+      sink.add(data);
+    }),
   );
-  await conn.open();
+}
+
+// choose a replication plugin decoding
+
+final transformer = _ServerChannel();
+
+void main(List<String> arguments) async {
+  final conn = await PgConnection.open(
+    PgEndpoint(
+      host: 'localhost',
+      port: 5432,
+      database: 'postgres',
+      username: 'postgres',
+      password: 'postgres',
+    ),
+    sessionSettings: PgSessionSettings(
+        replicationMode: ReplicationMode.logical,
+        queryMode: QueryMode.simple,
+        onBadSslCertificate: (cert) => true,
+        transformer: transformer.transformer,
+        encoding: utf8),
+  );
+
+  final replicationOutput = 'wal2json'; // another option is 'pgoutput'
 
   /* -------------------------------------------------------------------------- */
   /*                             listen to messages                             */
   /* -------------------------------------------------------------------------- */
   // this will handle keep alive messages and print any replication messages
   late LSN clientXLogPos;
-  final messagesSub = conn.messages.listen((msg) {
+  final messagesSub = transformer.messages.listen((msg) {
     /// Handle Keep Alive Messages to avoid losing connection
     if (msg is XLogDataMessage) {
       clientXLogPos = msg.walStart + msg.walDataLength;
     } else if (msg is PrimaryKeepAliveMessage) {
       if (msg.mustReply) {
         final statusUpdate = StandbyStatusUpdateMessage(walWritePosition: clientXLogPos, mustReply: false);
-        final copyDataMessage = CopyDataMessage(statusUpdate.asBytes());
-        conn.addMessage(copyDataMessage);
+        final copyDataMessage = CopyDataMessage(statusUpdate.asBytes(encoding: utf8));
+        transformer.addMessage(copyDataMessage);
       }
     }
 
@@ -74,8 +127,8 @@ void main(List<String> arguments) async {
   final replicationSlotName = 'a_test_slot';
 
   // create the publication and drop it if it exists
-  await conn.query('DROP PUBLICATION IF EXISTS $publicationName;', useSimpleQueryProtocol: true);
-  await conn.query('CREATE PUBLICATION $publicationName FOR ALL TABLES;', useSimpleQueryProtocol: true);
+  await conn.execute('DROP PUBLICATION IF EXISTS $publicationName;');
+  await conn.execute('CREATE PUBLICATION $publicationName FOR ALL TABLES;');
 
   /* -------------------------------------------------------------------------- */
   /*                           create replication slot                          */
@@ -86,8 +139,12 @@ void main(List<String> arguments) async {
 
   // Identify the system to get the `xlogpos` which is the current WAL flush location.
   // Useful to get a known location in the write-ahead log where streaming can start.
-  final sysInfo = (await conn.query('IDENTIFY_SYSTEM;', useSimpleQueryProtocol: true)).first.toColumnMap();
-  final xlogpos = sysInfo['xlogpos'] as String;
+  final sysInfo = (await conn.execute('IDENTIFY_SYSTEM;'));
+
+  // the sysinfo result comes as one row in the following schema as an example:
+  //  {systemid: 7284963011864342566, timeline: 1, xlogpos: 0/172A8F8, dbname: postgres}
+  // so `xlogpos` will be in the first row and the third column (hence [0][2])
+  final xlogpos = sysInfo[0][2] as String;
   clientXLogPos = LSN.fromString(xlogpos);
   // final timeline = sysInfo['timeline'] as String; // can be used for physical replication
 
@@ -108,8 +165,8 @@ void main(List<String> arguments) async {
   /// This future won't complete unless the server drops the connection
   /// or an error occurs
   /// or it times out
-  await conn.execute(stmt, timeoutInSeconds: 3600).catchError((e) {
-    return 0;
+  await conn.execute(stmt).timeout(Duration(seconds: 3600)).catchError((e) {
+    return e;
   });
 }
 
@@ -117,17 +174,15 @@ void main(List<String> arguments) async {
 /*                              helper functions                              */
 /* -------------------------------------------------------------------------- */
 
-Future<dynamic> dropReplicationSlotIfExists(PostgreSQLConnection conn, String slotname) async {
+Future<dynamic> dropReplicationSlotIfExists(PgConnection conn, String slotname) async {
   // using either 'DROP_REPLICATION_SLOT $replicationSlotName' or select pg_drop_replication_slot('$replicationSlotName')
   // will throw an error if the replication slot does not exist
   // see other replication mgmt functions here:
   // https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-REPLICATION
-  return await conn.query(
+  return await conn.execute(
     "select pg_drop_replication_slot('$slotname') from pg_replication_slots where slot_name = '$slotname';",
-    useSimpleQueryProtocol: true,
   );
 }
-
 
 /* 
 

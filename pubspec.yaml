@@ -9,8 +9,14 @@ environment:
 
 dependencies:
   # must be 2.5.0 or above. 
+  async: ^2.11.0
   postgres: ^2.5.0
+  stream_channel: ^2.1.2
 
 dev_dependencies:
   lints: ^2.0.0
   test: ^1.16.0
+
+dependency_overrides:
+  postgres:
+    path:  ../postgresql-dart

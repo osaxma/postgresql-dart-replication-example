@@ -35,11 +35,13 @@ Now that the database is ready, open two terminals and run the following:
     ```sh
     dart run listen.dart
     ```
+    > or `listen_v3.dart` that uses postgres package v3
 
 - In another terminal:
     ```sh
     dart run change.dart
     ```
+    > or `change_v3.dart` that uses postgres package v3
 
 
 Over the following few seconds, the first terminal should output the following:
