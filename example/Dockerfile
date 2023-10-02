@@ -2,9 +2,9 @@
 # also you need to update `postgresql-server-dev-XX` to use the same version.
 FROM postgres:14.5
 
-ENV POSTGRES_PASSWORD=postgres1
-ENV POSTGRES_USER=postgres1
-ENV POSTGRES_DB=postgres1
+ENV POSTGRES_PASSWORD=postgres
+ENV POSTGRES_USER=postgres
+ENV POSTGRES_DB=postgres
 
 RUN apt-get update
 RUN apt-get install -y postgresql-14-wal2json
