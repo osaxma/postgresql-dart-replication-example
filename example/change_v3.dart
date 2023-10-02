@@ -1,8 +1,8 @@
 import 'package:postgres/postgres_v3_experimental.dart';
 
-/// Run this file after running `listen.dart`
+/// Run this file after running `listen_v3.dart`
 ///
-/// This function will modify the database
+/// This function will modify the database to mimic changes
 void main() async {
   print('connecting to db');
   final conn = await PgConnection.open(
