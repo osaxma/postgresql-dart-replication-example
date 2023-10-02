@@ -13,10 +13,10 @@ import 'package:stream_channel/stream_channel.dart';
 import 'package:async/async.dart';
 
 /// A "Channel" that can send and receive messages to and from the Server.
-class _ServerChannel {
-  final controller = StreamController<ServerMessage>.broadcast();
+class ServerChannel {
+  final _controller = StreamController<ServerMessage>.broadcast();
 
-  Stream<ServerMessage> get messages => controller.stream;
+  Stream<ServerMessage> get messages => _controller.stream;
 
   EventSink<BaseMessage>? _cachedSink;
 
@@ -31,8 +31,8 @@ class _ServerChannel {
     // to listen to server messages
     StreamTransformer.fromHandlers(
       handleData: (data, sink) {
-        if (!controller.isClosed) {
-          controller.add(data as ServerMessage);
+        if (!_controller.isClosed) {
+          _controller.add(data as ServerMessage);
         }
         // let the message continue its journey
         sink.add(data);
@@ -49,18 +49,25 @@ class _ServerChannel {
         // let the message continue its journey
         sink.add(data);
       },
-      handleDone: (_) {
+      handleDone: (sink) {
         _cachedSink = null;
+        sink.close();
       },
-      handleError: (_, __, ___) {
+      handleError: (_, __, sink) {
         _cachedSink = null;
+        sink.close();
         // handle the error ...
       },
     ),
   );
+
+  Future<void> close() async {
+    _cachedSink = null;
+    await _controller.close();
+  }
 }
 
-final serverChannel = _ServerChannel();
+final serverChannel = ServerChannel();
 
 void main(List<String> arguments) async {
   final conn = await PgConnection.open(
@@ -78,9 +85,6 @@ void main(List<String> arguments) async {
         transformer: serverChannel.transformer,
         encoding: utf8),
   );
-
-  // choose a replication plugin decoding
-  final replicationOutput = 'wal2json'; // another option is 'pgoutput'
 
   /* -------------------------------------------------------------------------- */
   /*                             listen to messages                             */
@@ -119,6 +123,7 @@ void main(List<String> arguments) async {
   sigintSub = ProcessSignal.sigint.watch().listen((_) async {
     print('\nExiting...');
     sigintSub.cancel();
+    await serverChannel.close();
     await messagesSub.cancel();
     await conn.close();
   });
@@ -157,7 +162,11 @@ void main(List<String> arguments) async {
   /*                           start replication slot                           */
   /* -------------------------------------------------------------------------- */
   // read more here: https://www.postgresql.org/docs/current/protocol-replication.html
-  late final String stmt;
+
+  // choose a replication plugin decoding
+  final replicationOutput = 'wal2json'; // another option is 'pgoutput'
+
+  final String stmt;
   if (replicationOutput == 'wal2json') {
     stmt = "START_REPLICATION SLOT $replicationSlotName LOGICAL $xlogpos"
         "(\"pretty-print\" 'true')";
