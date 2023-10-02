@@ -6,7 +6,7 @@ import 'package:postgres/postgres_v3_experimental.dart';
 import 'package:postgres/postgres.dart';
 import 'package:postgres/messages.dart';
 
-// You need to add these two packages to pubspec.yaml
+// You need to add this package to pubspec.yaml
 import 'package:stream_channel/stream_channel.dart';
 
 /// An exposed "Channel" that provides a sink and a stream that can be used to send and receive server messages.
