@@ -8,66 +8,29 @@ import 'package:postgres/messages.dart';
 
 // You need to add these two packages to pubspec.yaml
 import 'package:stream_channel/stream_channel.dart';
-import 'package:async/async.dart';
 
-/// A "Channel" that can send and receive messages to and from the Server.
-class ServerChannel {
-  final _controller = StreamController<ServerMessage>.broadcast();
+/// An exposed "Channel" that provides a sink and a stream that can be used to send and receive server messages.
+class ExposedChannel implements StreamChannelTransformer<BaseMessage, BaseMessage> {
+  final Completer<StreamChannel<BaseMessage>> _completer = Completer();
 
-  Stream<ServerMessage> get messages => _controller.stream;
+  /// Use this sink to send messages to the server
+  Future<StreamSink> get sink async => (await _completer.future).sink;
 
-  EventSink<BaseMessage>? _cachedSink;
+  /// Use this stream to listen to messages from the server
+  Future<Stream> get stream async => (await _completer.future).stream;
 
-  void addMessage(BaseMessage message) {
-    if (_cachedSink == null) {
-      throw Exception('Cannot send message because sink is not available');
-    }
-    _cachedSink!.add(message);
-  }
-
-  late final transformer = StreamChannelTransformer<BaseMessage, BaseMessage>(
-    // to listen to server messages
-    StreamTransformer.fromHandlers(
-      handleData: (data, sink) {
-        if (!_controller.isClosed) {
-          _controller.add(data as ServerMessage);
-        }
-        // let the message continue its journey
-        sink.add(data);
-      },
-    ),
-    // this is intended to listen to client messages
-    // but we capture the sink and cache it so we can send messages
-    // to the server when needed.
-    StreamSinkTransformer.fromHandlers(
-      handleData: (data, sink) {
-        if (_cachedSink != sink) {
-          _cachedSink = sink;
-        }
-        // let the message continue its journey
-        sink.add(data);
-      },
-      handleDone: (sink) {
-        _cachedSink = null;
-        sink.close();
-      },
-      handleError: (_, __, sink) {
-        _cachedSink = null;
-        sink.close();
-        // handle the error ...
-      },
-    ),
-  );
-
-  Future<void> close() async {
-    _cachedSink = null;
-    await _controller.close();
+  @override
+  StreamChannel<BaseMessage> bind(StreamChannel<BaseMessage> channel) {
+    final broadcast = channel.changeStream((stream) => stream.asBroadcastStream());
+    _completer.complete(broadcast);
+    return broadcast;
   }
 }
 
-final serverChannel = ServerChannel();
-
 void main(List<String> arguments) async {
+  // let PgConnection bind our channel so we can use it to send/receive server messages.
+  final channel = ExposedChannel();
+  // create the replication connection
   final conn = await PgConnection.open(
     PgEndpoint(
       host: 'localhost',
@@ -77,19 +40,25 @@ void main(List<String> arguments) async {
       password: 'postgres',
     ),
     sessionSettings: PgSessionSettings(
-        replicationMode: ReplicationMode.logical,
-        queryMode: QueryMode.simple,
-        onBadSslCertificate: (cert) => true,
-        transformer: serverChannel.transformer,
-        encoding: utf8),
+      // Specify the type of connection for Streaming Replication
+      replicationMode: ReplicationMode.logical,
+      // In Streaming Replication connection, only the simple query protocol can be used.
+      queryMode: QueryMode.simple,
+      // pass our channel for binding
+      transformer: channel,
+    ),
   );
+
+  // Grab the stream and sink from the exposed channel after it has been binded by PgConnection
+  final stream = await channel.stream;
+  final sink = await channel.sink;
 
   /* -------------------------------------------------------------------------- */
   /*                             listen to messages                             */
   /* -------------------------------------------------------------------------- */
   // this will handle keep alive messages and print any replication messages
   late LSN clientXLogPos;
-  final messagesSub = serverChannel.messages.listen((msg) {
+  final messagesSub = stream.listen((msg) {
     /// Handle Keep Alive Messages to avoid losing connection
     if (msg is XLogDataMessage) {
       clientXLogPos = msg.walStart + msg.walDataLength;
@@ -97,18 +66,18 @@ void main(List<String> arguments) async {
       if (msg.mustReply) {
         final statusUpdate = StandbyStatusUpdateMessage(walWritePosition: clientXLogPos, mustReply: false);
         final copyDataMessage = CopyDataMessage(statusUpdate.asBytes(encoding: utf8));
-        serverChannel.addMessage(copyDataMessage);
+        sink.add(copyDataMessage);
       }
     }
 
-    if (msg is ErrorResponseMessage) {
+    if (msg is XLogDataMessage) {
+      print('received a change in database:');
+      final data = msg.data.toString();
+      // print the data with an indent 
+      print('\t${data.replaceAll('\n', '\n\t')}');
+      print('\t\t-------------------------------------\n');
+    } else if (msg is ErrorResponseMessage) {
       print('errr ${msg.fields.map((e) => e.text).join('. ')}');
-    } else {
-      if (msg is XLogDataMessage) {
-        print('received a change in database:');
-        print(msg.data);
-        print('-------------------------------------\n');
-      }
     }
   });
 
@@ -121,7 +90,6 @@ void main(List<String> arguments) async {
   sigintSub = ProcessSignal.sigint.watch().listen((_) async {
     print('\nExiting...');
     sigintSub.cancel();
-    await serverChannel.close();
     await messagesSub.cancel();
     await conn.close();
   });
