@@ -23,7 +23,7 @@
 
 5. Run the container (the three configs starting with `-c` are necessary for replication to work)
     ```
-    docker run -d -p 5432:5432 --name replication_example_container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres replication_example_image -c wal_level=logical -c max_replication_slots=5 -c max_wal_senders=5
+    docker run -d -p 5432:5432 --name replication_example_container replication_example_image -c wal_level=logical -c max_replication_slots=5 -c max_wal_senders=5    
     ```
 
 
