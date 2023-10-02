@@ -228,9 +228,11 @@ packages:
   postgres:
     dependency: "direct main"
     description:
-      path: "../postgresql-dart"
-      relative: true
-    source: path
+      path: "."
+      ref: master
+      resolved-ref: "3ee9d90ae50a7aa745f5e6fe6bf6d7a9c6419f6c"
+      url: "https://github.com/isoos/postgresql-dart.git"
+    source: git
     version: "2.6.2"
   pub_semver:
     dependency: transitive
