@@ -1,19 +1,18 @@
-import 'package:postgres/postgres_v3_experimental.dart';
+import 'package:postgres/legacy.dart';
 
-/// Run this file after running `listen_v3.dart`
+/// Run this file after running `listen.dart`
 ///
-/// This function will modify the database to mimic changes
+/// This function will modify the database
 void main() async {
-  print('connecting to db');
-  final conn = await PgConnection.open(
-    PgEndpoint(
-      host: 'localhost',
-      port: 5432,
-      database: 'postgres',
-      username: 'postgres',
-      password: 'postgres',
-    ),
+  final conn = PostgreSQLConnection(
+    'localhost',
+    5432,
+    'postgres',
+    username: 'postgres',
+    password: 'postgres',
   );
+  print('connecting to db');
+  await conn.open();
 
   // create table
   await conn.execute('''

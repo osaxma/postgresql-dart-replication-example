@@ -1,6 +1,6 @@
 # Listening PostgreSQL Logical Replication
 
-This repo contains an example under the [example folder](/example/) for listening to Postgresql Logical Replication using the dart `postgres` package ([pub] | [repo]) -- version 2.5.0 or above. This allows listening to changes in PostgreSQL database in the following manner:
+This repo contains an example under the [example folder](/example/) for listening to Postgresql Logical Replication using the dart `postgres` package ([pub] | [repo]) -- version `3.0.0 `or above (version ``>=2.5.0 <3.0.0` see [example/legacy](/example/legacy)). This allows listening to changes in PostgreSQL database in the following manner:
 
 [repo]: https://github.com/isoos/postgresql-dart
 [pub]: https://pub.dev/packages/postgres
