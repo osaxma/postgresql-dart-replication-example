@@ -13,6 +13,9 @@ void main() async {
       username: 'postgres',
       password: 'postgres',
     ),
+    sessionSettings: SessionSettings(
+      sslMode: SslMode.disable
+    )
   );
 
   // create table

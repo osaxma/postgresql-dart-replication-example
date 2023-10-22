@@ -45,6 +45,7 @@ void main(List<String> arguments) async {
       queryMode: QueryMode.simple,
       // pass our channel for binding
       transformer: channel,
+      sslMode: SslMode.disable
     ),
   );
 
